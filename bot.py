@@ -165,7 +165,7 @@ async def start_endless_mode(ctx, difficulty: str = None):
     embed = create_game_embed(
         game,
         title="♾️ Endless Mode Started!",
-        description=f"Started by {ctx.author.mention}\nGuess words from all categories!\nThe game continues until you quit.\n\n{game.get_score_display()}",
+        description=f"Started by {ctx.author.mention}\nGuess words from all categories!\nThe game continues until you quit.",
         color=discord.Color.purple()
     )
     
@@ -214,8 +214,6 @@ async def guess_letter(ctx, letter: str = None):
             color = discord.Color.gold()
             title = "🎉 You Won!"
             description = f"{ctx.author.mention} correctly guessed the word!"
-            if game.endless_mode:
-                game.wins += 1
         else:
             color = discord.Color.red()
             title = "💀 Game Over!"
@@ -292,14 +290,10 @@ async def solve_word(ctx, *, word: str = None):
             color = discord.Color.gold()
             title = "🎉 You Won!"
             description = f"{ctx.author.mention} correctly solved the word!"
-            if game.endless_mode:
-                game.wins += 1
         else:
             color = discord.Color.red()
             title = "💀 Game Over!"
             description = f"The word was: **{game.word}**"
-            if game.endless_mode:
-                game.losses += 1
     else:
         color = discord.Color.orange()
         title = "Hangman Game"
@@ -313,7 +307,7 @@ async def solve_word(ctx, *, word: str = None):
     if result['game_over']:
         if game.endless_mode:
             # Continue to next round
-            await ctx.send(f"**🔄 Next round starting in 3 seconds...**\n{game.get_score_display()}")
+            await ctx.send("**🔄 Next round starting in 3 seconds...**")
             await asyncio.sleep(3)
             
             # Get new word
@@ -324,7 +318,7 @@ async def solve_word(ctx, *, word: str = None):
             embed = create_game_embed(
                 game,
                 title="🎮 Next Round!",
-                description=f"New word from **{category.title()}** category!\n{game.get_score_display()}",
+                description=f"New word from **{category.title()}** category!",
                 color=discord.Color.blue()
             )
             await ctx.send(embed=embed)
@@ -352,8 +346,6 @@ async def quit_game(ctx):
     
     # Create final embed showing the word
     description = f"{ctx.author.mention} ended the game.\nThe word was: **{game.word}**"
-    if game.endless_mode:
-        description += f"\n\n{game.get_score_display()}"
     
     embed = discord.Embed(
         title="🏳️ Game Ended",
