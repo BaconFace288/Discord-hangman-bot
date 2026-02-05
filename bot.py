@@ -4,6 +4,7 @@ Discord Hangman Bot - A fun hangman game for Discord servers.
 
 import os
 import discord
+import asyncio
 from discord.ext import commands
 from dotenv import load_dotenv
 from game import HangmanGame, WordDatabase
@@ -130,6 +131,48 @@ async def start_game(ctx, category: str = None, difficulty: str = None):
     await ctx.send(embed=embed)
 
 
+@bot.command(name='endless', aliases=['infinity', 'marathon'])
+async def start_endless_mode(ctx, difficulty: str = None):
+    """
+    Start an endless mode game that cycles through all categories.
+    
+    Usage:
+        !endless - Start endless mode with random difficulties
+        !endless easy - Start endless mode with only easy words
+        !endless hard - Start endless mode with only hard words
+    """
+    channel_id = ctx.channel.id
+    
+    # Check if game already exists in this channel
+    if channel_id in active_games and not active_games[channel_id].is_over:
+        await ctx.send("❌ A game is already in progress in this channel! Use `!quit` to end it.")
+        return
+    
+    # Validate difficulty if provided
+    if difficulty and difficulty.lower() not in word_db.get_difficulties():
+        available = ', '.join(word_db.get_difficulties())
+        await ctx.send(f"❌ Invalid difficulty! Available difficulties: **{available}**")
+        return
+    
+    # Get random word from any category
+    word, selected_category, selected_difficulty = word_db.get_random_word(None, difficulty)
+    
+    # Create new game in endless mode
+    game = HangmanGame(word, selected_category, selected_difficulty, endless_mode=True)
+    active_games[channel_id] = game
+    
+    # Send game start message
+    embed = create_game_embed(
+        game,
+        title="♾️ Endless Mode Started!",
+        description=f"Started by {ctx.author.mention}\nGuess words from all categories!\nThe game continues until you quit.\n\n{game.get_score_display()}",
+        color=discord.Color.purple()
+    )
+    
+    await ctx.send(embed=embed)
+
+
+
 @bot.command(name='guess', aliases=['g'])
 async def guess_letter(ctx, letter: str = None):
     """
@@ -171,10 +214,14 @@ async def guess_letter(ctx, letter: str = None):
             color = discord.Color.gold()
             title = "🎉 You Won!"
             description = f"{ctx.author.mention} correctly guessed the word!"
+            if game.endless_mode:
+                game.wins += 1
         else:
             color = discord.Color.red()
             title = "💀 Game Over!"
             description = f"The word was: **{game.word}**"
+            if game.endless_mode:
+                game.losses += 1
     else:
         color = discord.Color.green() if result['correct'] else discord.Color.orange()
         title = "Hangman Game"
@@ -184,9 +231,28 @@ async def guess_letter(ctx, letter: str = None):
     embed = create_game_embed(game, title=title, description=description, color=color)
     await ctx.send(embed=embed)
     
-    # Clean up if game is over
+    # Handle game over
     if result['game_over']:
-        del active_games[channel_id]
+        if game.endless_mode:
+            # Continue to next round
+            await ctx.send(f"**🔄 Next round starting in 3 seconds...**\\n{game.get_score_display()}")
+            await asyncio.sleep(3)
+            
+            # Get new word
+            word, category, difficulty = word_db.get_random_word()
+            game.reset_for_new_round(word, category, difficulty)
+            
+            # Send new game embed
+            embed = create_game_embed(
+                game,
+                title="🎮 Next Round!",
+                description=f"New word from **{category.title()}** category!\\n{game.get_score_display()}",
+                color=discord.Color.blue()
+            )
+            await ctx.send(embed=embed)
+        else:
+            # Clean up if not endless mode
+            del active_games[channel_id]
 
 
 @bot.command(name='solve', aliases=['word'])
@@ -226,10 +292,14 @@ async def solve_word(ctx, *, word: str = None):
             color = discord.Color.gold()
             title = "🎉 You Won!"
             description = f"{ctx.author.mention} correctly solved the word!"
+            if game.endless_mode:
+                game.wins += 1
         else:
             color = discord.Color.red()
             title = "💀 Game Over!"
             description = f"The word was: **{game.word}**"
+            if game.endless_mode:
+                game.losses += 1
     else:
         color = discord.Color.orange()
         title = "Hangman Game"
@@ -239,9 +309,28 @@ async def solve_word(ctx, *, word: str = None):
     embed = create_game_embed(game, title=title, description=description, color=color)
     await ctx.send(embed=embed)
     
-    # Clean up if game is over
+    # Handle game over
     if result['game_over']:
-        del active_games[channel_id]
+        if game.endless_mode:
+            # Continue to next round
+            await ctx.send(f"**🔄 Next round starting in 3 seconds...**\n{game.get_score_display()}")
+            await asyncio.sleep(3)
+            
+            # Get new word
+            word, category, difficulty = word_db.get_random_word()
+            game.reset_for_new_round(word, category, difficulty)
+            
+            # Send new game embed
+            embed = create_game_embed(
+                game,
+                title="🎮 Next Round!",
+                description=f"New word from **{category.title()}** category!\n{game.get_score_display()}",
+                color=discord.Color.blue()
+            )
+            await ctx.send(embed=embed)
+        else:
+            # Clean up if not endless mode
+            del active_games[channel_id]
 
 
 @bot.command(name='quit', aliases=['end', 'stop'])
@@ -262,9 +351,13 @@ async def quit_game(ctx):
     game = active_games[channel_id]
     
     # Create final embed showing the word
+    description = f"{ctx.author.mention} ended the game.\nThe word was: **{game.word}**"
+    if game.endless_mode:
+        description += f"\n\n{game.get_score_display()}"
+    
     embed = discord.Embed(
         title="🏳️ Game Ended",
-        description=f"{ctx.author.mention} ended the game.\nThe word was: **{game.word}**",
+        description=description,
         color=discord.Color.light_gray()
     )
     
@@ -344,6 +437,7 @@ async def show_help(ctx):
         name="🎯 Game Commands",
         value=(
             "`!hangman [category] [difficulty]` - Start a new game\n"
+            "`!endless [difficulty]` - Start endless mode (all categories)\n"
             "`!guess <letter>` - Guess a letter\n"
             "`!solve <word>` - Attempt to solve the word\n"
             "`!hint` - Get a hint about the word\n"

@@ -86,7 +86,7 @@ class HangmanGame:
     
     MAX_WRONG_GUESSES = 6
     
-    def __init__(self, word: str, category: str, difficulty: str):
+    def __init__(self, word: str, category: str, difficulty: str, endless_mode: bool = False):
         """
         Initialize a new hangman game.
         
@@ -94,6 +94,7 @@ class HangmanGame:
             word: The word to guess
             category: The category of the word
             difficulty: The difficulty level
+            endless_mode: Whether this is an endless mode game
         """
         self.word = word.upper()
         self.category = category
@@ -102,6 +103,9 @@ class HangmanGame:
         self.wrong_guesses: Set[str] = set()
         self.is_over = False
         self.is_won = False
+        self.endless_mode = endless_mode
+        self.wins = 0
+        self.losses = 0
         
     @property
     def wrong_guess_count(self) -> int:
@@ -287,6 +291,23 @@ class HangmanGame:
             result.append(f"❌ Wrong: {', '.join(wrong)}")
         
         return '\n'.join(result) if result else 'No guesses yet'
+    
+    def reset_for_new_round(self, word: str, category: str, difficulty: str):
+        """Reset the game for a new round in endless mode."""
+        self.word = word.upper()
+        self.category = category
+        self.difficulty = difficulty
+        self.guessed_letters = set()
+        self.wrong_guesses = set()
+        self.is_over = False
+        self.is_won = False
+    
+    def get_score_display(self) -> str:
+        """Get formatted score for endless mode."""
+        if self.endless_mode:
+            total = self.wins + self.losses
+            return f"🏆 Score: {self.wins} Wins | {self.losses} Losses | {total} Total"
+        return ""
 
 
 class WordDatabase:
