@@ -16,7 +16,7 @@ TOKEN = os.getenv('DISCORD_BOT_TOKEN')
 # Bot setup with command prefix
 intents = discord.Intents.default()
 intents.message_content = True
-bot = commands.Bot(command_prefix='!', intents=intents)
+bot = commands.Bot(command_prefix='!', intents=intents, help_command=None)
 
 # Store active games per channel
 active_games: Dict[int, HangmanGame] = {}
